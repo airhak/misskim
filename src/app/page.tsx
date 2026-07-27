@@ -4,6 +4,7 @@ import { useRef, useEffect, useState } from 'react';
 import styles from './page.module.css';
 import EventFormModal from '@/components/EventFormModal';
 import LocationSettingModal from '@/components/LocationSettingModal';
+import AssistantChat from '@/components/AssistantChat';
 import { createEvent, deleteEvent, getEventsBetween, getEventsByDate, updateEvent } from '@/lib/scheduleApi';
 import { getLocationSetting, getWeatherByDate, setLocationSetting } from '@/lib/weatherApi';
 import { EVENT_TYPE_LABELS, type LocationSetting, type ScheduleEvent, type WeatherDoc } from '@/lib/types';
@@ -61,6 +62,7 @@ export default function Home() {
   const [weather, setWeather] = useState<WeatherDoc | null>(null);
   const [location, setLocation] = useState<LocationSetting | null>(null);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   async function refreshWeek() {
     try {
@@ -171,6 +173,10 @@ export default function Home() {
           <h1 className={styles.title}>오늘의 일정</h1>
           <span className={styles.dateLabel}>{date}</span>
         </div>
+
+        <button className={styles.buttonPrimary} onClick={() => setIsChatOpen(true)}>
+          💬 미스킴에게 말하기
+        </button>
 
         <div className={styles.weatherRow}>
           {weather ? (
@@ -297,6 +303,10 @@ export default function Home() {
           onSave={handleLocationSave}
           onClose={() => setIsLocationModalOpen(false)}
         />
+      )}
+
+      {isChatOpen && (
+        <AssistantChat onClose={() => setIsChatOpen(false)} onEventCreated={refresh} />
       )}
     </div>
   );
