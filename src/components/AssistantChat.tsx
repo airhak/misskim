@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import styles from '@/app/page.module.css';
-import { createEvent, getEventsBetween } from '@/lib/scheduleApi';
+import { createEvent, deleteEvent, getEventsBetween } from '@/lib/scheduleApi';
 import { KOREAN_CITY_PRESETS, buildWeatherReplyText, fetchForecastForDate, searchLocation } from '@/lib/weatherApi';
 import { EVENT_TYPE_LABELS, type EventType, type LocationSetting, type ScheduleEvent } from '@/lib/types';
 
@@ -24,6 +24,12 @@ interface ChatQuery {
   dateFrom: string;
   dateTo: string;
   location?: string | null;
+}
+
+interface ChatDeleteQuery {
+  dateFrom: string;
+  dateTo: string;
+  keyword: string;
 }
 
 interface AssistantChatProps {
@@ -89,6 +95,7 @@ export default function AssistantChat({ location, onClose, onEventCreated }: Ass
     { role: 'model', text: '안녕하세요, 대표님. 일정을 말씀해 주시면 등록해드릴게요.' },
   ]);
   const [pendingAction, setPendingAction] = useState<ChatAction | null>(null);
+  const [pendingDeletes, setPendingDeletes] = useState<ScheduleEvent[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +103,7 @@ export default function AssistantChat({ location, onClose, onEventCreated }: Ass
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, pendingAction]);
+  }, [messages, pendingAction, pendingDeletes]);
 
   async function handleSend() {
     const text = input.trim();
@@ -105,6 +112,7 @@ export default function AssistantChat({ location, onClose, onEventCreated }: Ass
     setMessages(nextMessages);
     setInput('');
     setPendingAction(null);
+    setPendingDeletes([]);
     setLoading(true);
     setError(null);
     try {
@@ -118,6 +126,7 @@ export default function AssistantChat({ location, onClose, onEventCreated }: Ass
       setMessages(prev => [...prev, { role: 'model', text: data.reply }]);
       if (data.action) setPendingAction(data.action);
       if (data.query) await handleQuery(data.query);
+      if (data.deleteQuery) await handleDeleteQuery(data.deleteQuery);
     } catch (err) {
       setError(err instanceof Error ? err.message : '오류가 발생했습니다.');
     } finally {
@@ -147,6 +156,33 @@ export default function AssistantChat({ location, onClose, onEventCreated }: Ass
     } catch {
       setMessages(prev => [...prev, { role: 'model', text: '조회 중 오류가 발생했습니다.' }]);
     }
+  }
+
+  async function handleDeleteQuery(dq: ChatDeleteQuery) {
+    try {
+      const events = await getEventsBetween(dq.dateFrom, dq.dateTo);
+      const keyword = dq.keyword.trim().toLowerCase();
+      const matches = keyword ? events.filter(e => e.title.toLowerCase().includes(keyword)) : events;
+      if (matches.length === 0) {
+        setMessages(prev => [...prev, { role: 'model', text: `"${dq.keyword}"이(가) 포함된 일정을 찾지 못했습니다.` }]);
+        return;
+      }
+      setPendingDeletes(matches);
+    } catch {
+      setMessages(prev => [...prev, { role: 'model', text: '삭제할 일정을 찾는 중 오류가 발생했습니다.' }]);
+    }
+  }
+
+  async function handleConfirmDelete(event: ScheduleEvent) {
+    await deleteEvent(event.id);
+    setMessages(prev => [...prev, { role: 'model', text: `✅ "${event.title}" 일정을 삭제했습니다.` }]);
+    setPendingDeletes(prev => prev.filter(e => e.id !== event.id));
+    onEventCreated();
+  }
+
+  function handleCancelDeletes() {
+    setMessages(prev => [...prev, { role: 'model', text: '삭제하지 않았습니다.' }]);
+    setPendingDeletes([]);
   }
 
   async function handleConfirm() {
@@ -215,6 +251,32 @@ export default function AssistantChat({ location, onClose, onEventCreated }: Ass
                 <button className={styles.buttonPrimary} onClick={handleConfirm}>등록</button>
                 <button className={styles.button} onClick={handleCancel}>취소</button>
               </div>
+            </div>
+          )}
+          {pendingDeletes.length > 0 && (
+            <div
+              style={{
+                border: '1px solid rgba(239,68,68,0.5)',
+                borderRadius: '0.6rem',
+                padding: '0.6rem 0.75rem',
+                fontSize: '0.8rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.4rem',
+              }}
+            >
+              {pendingDeletes.map(event => (
+                <div key={event.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <span>
+                    🗑️ {event.date} {event.time ?? ''} · {event.title}
+                    {event.location ? ` · ${event.location}` : ''}
+                  </span>
+                  <button className={styles.button} onClick={() => handleConfirmDelete(event)}>삭제</button>
+                </div>
+              ))}
+              <button className={styles.button} onClick={handleCancelDeletes} style={{ alignSelf: 'flex-start' }}>
+                모두 취소
+              </button>
             </div>
           )}
           {loading && <p className={styles.hint}>생각 중...</p>}
