@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import styles from '@/app/page.module.css';
 import { createEvent, getEventsBetween } from '@/lib/scheduleApi';
-import { buildWeatherReplyText, fetchForecastForDate } from '@/lib/weatherApi';
+import { KOREAN_CITY_PRESETS, buildWeatherReplyText, fetchForecastForDate, searchLocation } from '@/lib/weatherApi';
 import { EVENT_TYPE_LABELS, type EventType, type LocationSetting, type ScheduleEvent } from '@/lib/types';
 
 interface ChatMsg {
@@ -23,6 +23,7 @@ interface ChatQuery {
   type: 'schedule' | 'weather';
   dateFrom: string;
   dateTo: string;
+  location?: string | null;
 }
 
 interface AssistantChatProps {
@@ -44,6 +45,25 @@ function dateRange(from: string, to: string): string[] {
     guard += 1;
   }
   return result;
+}
+
+// 채팅에서 언급된 지역명을 좌표로 바꾼다. 프리셋 도시(한글) 우선, 없으면 Open-Meteo 검색(영문)을
+// 시도하고, 그래도 안 되면 사용자가 설정해둔 근무 지역으로 대체한다.
+async function resolveWeatherLocation(
+  name: string | null | undefined,
+  fallback: LocationSetting | null
+): Promise<{ lat: number; lon: number; label: string } | null> {
+  if (name) {
+    const preset = KOREAN_CITY_PRESETS.find(c => c.name === name || name.includes(c.name) || c.name.includes(name));
+    if (preset) return { lat: preset.lat, lon: preset.lon, label: preset.name };
+    try {
+      const results = await searchLocation(name);
+      if (results[0]) return { lat: results[0].lat, lon: results[0].lon, label: results[0].name };
+    } catch {
+      // 검색 실패는 무시하고 기본 지역으로 넘어간다.
+    }
+  }
+  return fallback ? { lat: fallback.lat, lon: fallback.lon, label: fallback.name } : null;
 }
 
 function formatScheduleReply(events: ScheduleEvent[], dateFrom: string, dateTo: string): string {
@@ -113,14 +133,16 @@ export default function AssistantChat({ location, onClose, onEventCreated }: Ass
         return;
       }
       // weather
-      if (!location) {
-        setMessages(prev => [...prev, { role: 'model', text: '근무 지역이 설정되어 있지 않아요. 먼저 지역 설정을 해주세요.' }]);
+      const resolved = await resolveWeatherLocation(query.location, location);
+      if (!resolved) {
+        setMessages(prev => [...prev, { role: 'model', text: '지역을 확인할 수 없어요. 먼저 근무 지역을 설정해주세요.' }]);
         return;
       }
       const dates = dateRange(query.dateFrom, query.dateTo);
-      const results = await Promise.all(dates.map(d => fetchForecastForDate(location.lat, location.lon, d)));
+      const results = await Promise.all(dates.map(d => fetchForecastForDate(resolved.lat, resolved.lon, d)));
       const lines = results.filter((r): r is NonNullable<typeof r> => r !== null).map(buildWeatherReplyText);
-      const text = lines.length > 0 ? lines.join('\n') : '해당 날짜의 날씨 예보를 가져오지 못했습니다.';
+      const text =
+        lines.length > 0 ? `[${resolved.label}]\n${lines.join('\n')}` : '해당 날짜의 날씨 예보를 가져오지 못했습니다.';
       setMessages(prev => [...prev, { role: 'model', text }]);
     } catch {
       setMessages(prev => [...prev, { role: 'model', text: '조회 중 오류가 발생했습니다.' }]);

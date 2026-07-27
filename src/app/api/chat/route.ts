@@ -37,6 +37,7 @@ query 규칙 (조회):
   - "오늘 일정" → dateFrom=dateTo=오늘
   - "내일 날씨" → dateFrom=dateTo=내일
   - "이번 주 일정" → 이번 주 월요일~일요일
+- 날씨 조회에서 "인천 날씨", "부산은 어때" 처럼 특정 지역이 언급되면 location 필드에 그 지역명(예: '인천')을 넣으세요. 언급이 없으면 location은 null(그러면 사용자의 기본 근무 지역을 씁니다). 일정 조회에서는 location을 쓰지 않습니다(항상 null).
 - query를 채웠다면 reply는 짧게 "확인해볼게요" 정도로만 쓰세요 (실제 답은 시스템이 데이터를 붙여서 별도로 보여줍니다).
 - action과 query를 동시에 채우지 마세요. 한쪽만 선택하세요.
 
@@ -66,6 +67,11 @@ const RESPONSE_SCHEMA = {
         type: { type: Type.STRING, enum: ['schedule', 'weather'] },
         dateFrom: { type: Type.STRING, description: 'YYYY-MM-DD' },
         dateTo: { type: Type.STRING, description: 'YYYY-MM-DD' },
+        location: {
+          type: Type.STRING,
+          nullable: true,
+          description: '날씨 조회에서 문장에 특정 지역이 언급됐으면 그 지역명, 아니면 null',
+        },
       },
       required: ['type', 'dateFrom', 'dateTo'],
     },
