@@ -38,6 +38,22 @@
   color: #64748b;
 }
 
+.weatherRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  background: #131a2b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.6rem;
+}
+
+.weatherText {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
 .errorText {
   font-size: 0.85rem;
   color: #f87171;

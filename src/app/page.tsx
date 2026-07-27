@@ -3,11 +3,14 @@
 import { useRef, useEffect, useState } from 'react';
 import styles from './page.module.css';
 import EventFormModal from '@/components/EventFormModal';
+import LocationSettingModal from '@/components/LocationSettingModal';
 import { createEvent, deleteEvent, getEventsByDate, updateEvent } from '@/lib/scheduleApi';
-import { EVENT_TYPE_LABELS, type ScheduleEvent } from '@/lib/types';
+import { getLocationSetting, getWeatherByDate, setLocationSetting } from '@/lib/weatherApi';
+import { EVENT_TYPE_LABELS, type LocationSetting, type ScheduleEvent, type WeatherDoc } from '@/lib/types';
 import { OUTRO_AUDIO_URL } from '@/lib/voice';
 
 const OUTRO_TRACK_ID = '__outro__';
+const WEATHER_TRACK_ID = '__weather__';
 
 interface BriefingTrack {
   url: string;
@@ -32,6 +35,9 @@ export default function Home() {
   );
   const [playingEventId, setPlayingEventId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [weather, setWeather] = useState<WeatherDoc | null>(null);
+  const [location, setLocation] = useState<LocationSetting | null>(null);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   async function refresh() {
     try {
@@ -55,7 +61,19 @@ export default function Home() {
         setError(err instanceof Error ? err.message : '일정을 불러오지 못했습니다.');
       })
       .finally(() => setLoading(false));
+    getWeatherByDate(date)
+      .then(setWeather)
+      .catch(() => setWeather(null));
+    getLocationSetting()
+      .then(setLocation)
+      .catch(() => setLocation(null));
   }, [date]);
+
+  async function handleLocationSave(next: LocationSetting) {
+    await setLocationSetting(next);
+    setLocation(next);
+    setIsLocationModalOpen(false);
+  }
 
   async function handleSave(patch: Omit<ScheduleEvent, 'id'>) {
     if (modalState?.mode === 'edit' && modalState.event) {
@@ -94,6 +112,9 @@ export default function Home() {
     const playlist: BriefingTrack[] = events
       .filter(event => event.audioUrl)
       .map(event => ({ url: event.audioUrl as string, eventId: event.id }));
+    if (weather?.audioUrl) {
+      playlist.push({ url: weather.audioUrl, eventId: WEATHER_TRACK_ID });
+    }
     if (playlist.length === 0) return;
     playlist.push({ url: OUTRO_AUDIO_URL, eventId: OUTRO_TRACK_ID });
     playTrack(playlist, 0);
@@ -115,6 +136,21 @@ export default function Home() {
           <span className={styles.dateLabel}>{date}</span>
         </div>
 
+        <div className={styles.weatherRow}>
+          {weather ? (
+            <span
+              className={`${styles.weatherText} ${playingEventId === WEATHER_TRACK_ID ? styles.eventRowPlaying : ''}`}
+            >
+              {weather.summaryText}
+            </span>
+          ) : (
+            <span className={styles.hint}>{location ? '오늘 날씨 정보 없음' : '근무 지역이 설정되지 않았습니다'}</span>
+          )}
+          <button className={styles.deleteButton} onClick={() => setIsLocationModalOpen(true)}>
+            지역 설정{location ? ` (${location.name})` : ''}
+          </button>
+        </div>
+
         {loading && <p className={styles.hint}>불러오는 중...</p>}
         {error && <p className={styles.errorText}>{error}</p>}
 
@@ -122,12 +158,12 @@ export default function Home() {
           <p className={styles.hint}>오늘 등록된 일정이 없습니다.</p>
         )}
 
-        {!loading && !error && events.length > 0 && (
+        {!loading && !error && (events.length > 0 || weather?.audioUrl) && (
           <div className={styles.briefingRow}>
             {playingEventId ? (
               <button className={styles.buttonPrimary} onClick={stopBriefing}>■ 브리핑 중지</button>
             ) : (
-              <button className={styles.buttonPrimary} onClick={startBriefing} disabled={readyCount === 0}>
+              <button className={styles.buttonPrimary} onClick={startBriefing} disabled={readyCount === 0 && !weather?.audioUrl}>
                 ▶ 오늘 브리핑 듣기
               </button>
             )}
@@ -174,6 +210,14 @@ export default function Home() {
           initial={modalState.event}
           onSave={handleSave}
           onClose={() => setModalState(null)}
+        />
+      )}
+
+      {isLocationModalOpen && (
+        <LocationSettingModal
+          current={location}
+          onSave={handleLocationSave}
+          onClose={() => setIsLocationModalOpen(false)}
         />
       )}
     </div>
