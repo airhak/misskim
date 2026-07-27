@@ -59,17 +59,56 @@ export async function searchLocation(query: string): Promise<LocationCandidate[]
   }));
 }
 
+// WMO 날씨 코드 → 한국어 표현. https://open-meteo.com/en/docs 의 weather_code 표를 따른다.
+const WEATHER_CODE_LABELS: Record<number, string> = {
+  0: '맑음',
+  1: '대체로 맑음',
+  2: '구름 조금',
+  3: '흐림',
+  45: '안개',
+  48: '안개',
+  51: '약한 이슬비',
+  53: '이슬비',
+  55: '강한 이슬비',
+  56: '약한 착빙성 이슬비',
+  57: '착빙성 이슬비',
+  61: '약한 비',
+  63: '비',
+  65: '강한 비',
+  66: '약한 착빙성 비',
+  67: '착빙성 비',
+  71: '약한 눈',
+  73: '눈',
+  75: '강한 눈',
+  77: '싸락눈',
+  80: '약한 소나기',
+  81: '소나기',
+  82: '강한 소나기',
+  85: '약한 눈 소나기',
+  86: '강한 눈 소나기',
+  95: '뇌우',
+  96: '우박을 동반한 뇌우',
+  99: '강한 우박을 동반한 뇌우',
+};
+
+function weatherCodeToKorean(code: number): string {
+  return WEATHER_CODE_LABELS[code] ?? '알 수 없음';
+}
+
 export interface ForecastResult {
   date: string;
+  condition: string; // 맑음/흐림/비/눈 등
   tempMin: number;
   tempMax: number;
   tempAvg: number;
   precipitationChance: number; // 오후(12~18시) 시간대 중 최댓값
 }
 
+const FORECAST_DAILY_FIELDS = 'temperature_2m_max,temperature_2m_min,weathercode';
+
 // 브리핑 화면/음성이 그때그때 실시간으로 이 함수를 호출해서 예보를 받는다. API 키 불필요.
 export async function fetchForecast(lat: number, lon: number): Promise<ForecastResult> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min&hourly=precipitation_probability&timezone=Asia%2FSeoul&forecast_days=1`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=${FORECAST_DAILY_FIELDS}&hourly=precipitation_probability&timezone=Asia%2FSeoul&forecast_days=1`;
   const res = await fetch(url);
   const data = await res.json();
 
@@ -91,6 +130,7 @@ export async function fetchForecast(lat: number, lon: number): Promise<ForecastR
 
   return {
     date: data.daily.time[0],
+    condition: weatherCodeToKorean(data.daily.weathercode[0]),
     tempMin,
     tempMax,
     tempAvg,
@@ -101,14 +141,14 @@ export async function fetchForecast(lat: number, lon: number): Promise<ForecastR
 // TTS로 그대로 넘겨서 날씨 음성을 만드는 문구. 화면 표시에도 동일하게 쓴다.
 export function buildWeatherSummaryText(forecast: ForecastResult): string {
   const rainPart =
-    forecast.precipitationChance >= 50 ? '오후에는 비가 내립니다. 우산을 준비하셔야 합니다. ' : '';
-  return `${rainPart}오늘 평균 기온은 ${Math.round(forecast.tempAvg)}도 입니다.`;
+    forecast.precipitationChance >= 50 ? ' 오후에는 비가 내립니다. 우산을 준비하셔야 합니다.' : '';
+  return `오늘 날씨는 ${forecast.condition}이며, 평균 기온은 ${Math.round(forecast.tempAvg)}도 입니다.${rainPart}`;
 }
 
 // 채팅에서 "내일 날씨 어때?" 같은 특정 날짜 조회에 쓴다. forecast_days를 넉넉히 잡아 여러 날을 한 번에 받고,
 // targetDate와 일치하는 날짜만 뽑아낸다. 조회 범위(대략 2주) 밖의 날짜면 null.
 export async function fetchForecastForDate(lat: number, lon: number, targetDate: string): Promise<ForecastResult | null> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min&hourly=precipitation_probability&timezone=Asia%2FSeoul&forecast_days=14`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=${FORECAST_DAILY_FIELDS}&hourly=precipitation_probability&timezone=Asia%2FSeoul&forecast_days=14`;
   const res = await fetch(url);
   const data = await res.json();
 
@@ -131,11 +171,18 @@ export async function fetchForecastForDate(lat: number, lon: number, targetDate:
     }
   }
 
-  return { date: targetDate, tempMin, tempMax, tempAvg, precipitationChance: afternoonMax };
+  return {
+    date: targetDate,
+    condition: weatherCodeToKorean(data.daily.weathercode[dayIndex]),
+    tempMin,
+    tempMax,
+    tempAvg,
+    precipitationChance: afternoonMax,
+  };
 }
 
 // 채팅 조회 답변용 — 날짜를 문장 앞에 붙여서 여러 날을 답할 때도 헷갈리지 않게 한다.
 export function buildWeatherReplyText(forecast: ForecastResult): string {
   const rainPart = forecast.precipitationChance >= 50 ? ' 오후에 비 소식이 있어 우산이 필요해요.' : '';
-  return `${forecast.date}: 최저 ${Math.round(forecast.tempMin)}도 / 최고 ${Math.round(forecast.tempMax)}도, 평균 ${Math.round(forecast.tempAvg)}도.${rainPart}`;
+  return `${forecast.date}: ${forecast.condition}, 최저 ${Math.round(forecast.tempMin)}도 / 최고 ${Math.round(forecast.tempMax)}도, 평균 ${Math.round(forecast.tempAvg)}도.${rainPart}`;
 }
