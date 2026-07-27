@@ -1,0 +1,242 @@
+.page {
+  min-height: 100dvh;
+  background: #0b0f1a;
+  color: #e2e8f0;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.main {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.headerRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.dateLabel {
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.hint {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.errorText {
+  font-size: 0.85rem;
+  color: #f87171;
+}
+
+.eventList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.eventRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 0.9rem;
+  background: #131a2b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.6rem;
+  cursor: pointer;
+}
+
+.eventRow:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.eventRowPlaying {
+  border-color: rgb(99, 102, 241);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.briefingRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.eventTime {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #a5b4fc;
+  min-width: 3.2rem;
+}
+
+.eventBadge {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #c7d2fe;
+  white-space: nowrap;
+}
+
+.eventTitle {
+  flex: 1;
+  font-weight: 500;
+}
+
+.eventLocation {
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.deleteButton {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+}
+
+.deleteButton:hover {
+  color: #f87171;
+}
+
+.button {
+  padding: 0.55rem 1rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.buttonPrimary {
+  padding: 0.65rem 1rem;
+  background: rgb(99, 102, 241);
+  border: none;
+  border-radius: 0.5rem;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.buttonPrimary:disabled,
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(4px);
+}
+
+.modalBox {
+  background: #0e1320;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.85rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7);
+  width: 420px;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - 4rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modalHeader {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.modalBody {
+  padding: 1.25rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.modalFooter {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.formLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.input,
+.textarea {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+}
+
+.input:focus,
+.textarea:focus {
+  outline: none;
+  border-color: rgb(99, 102, 241);
+}
+
+.textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.typeRow {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.typeButton {
+  padding: 0.35rem 0.7rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.typeButtonActive {
+  background: rgb(99, 102, 241);
+  border-color: rgb(99, 102, 241);
+  color: #fff;
+}
