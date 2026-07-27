@@ -276,13 +276,25 @@ export default function Home() {
                     <div
                       key={e.id}
                       className={styles.weekEventLine}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                       onClick={ev => {
                         ev.stopPropagation();
                         setModalState({ mode: 'edit', event: e, targetDate: d });
                       }}
                     >
-                      {e.time ? `${e.time} ` : ''}
-                      {e.title}
+                      <span>
+                        {e.time ? `${e.time} ` : ''}
+                        {e.title}
+                      </span>
+                      <button
+                        className={styles.deleteButton}
+                        onClick={ev => {
+                          ev.stopPropagation();
+                          handleDelete(e.id);
+                        }}
+                      >
+                        삭제
+                      </button>
                     </div>
                   ))
                 )}
