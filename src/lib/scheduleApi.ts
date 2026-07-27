@@ -2,7 +2,6 @@ import {
   addDoc,
   collection,
   deleteDoc,
-  deleteField,
   doc,
   getDocs,
   orderBy,
@@ -12,10 +11,6 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { ScheduleEvent } from './types';
-
-// 음성 내용에 영향을 주는 필드. 이 중 하나라도 바뀌면 기존 audioUrl은 더 이상 맞지 않으므로 지워서
-// 다음날 아침 예약 작업이 새로 생성하게 한다.
-const SPEECH_AFFECTING_FIELDS: (keyof ScheduleEvent)[] = ['time', 'title', 'location', 'type'];
 
 const EVENTS_COLLECTION = 'events';
 
@@ -70,13 +65,7 @@ export async function createEvent(event: Omit<ScheduleEvent, 'id'>): Promise<str
 }
 
 export async function updateEvent(id: string, patch: Partial<Omit<ScheduleEvent, 'id'>>): Promise<void> {
-  const cleaned = stripUndefined(patch);
-  const touchesSpeech = SPEECH_AFFECTING_FIELDS.some(field => field in patch);
-  const payload: Record<string, unknown> = { ...cleaned };
-  if (touchesSpeech) {
-    payload.audioUrl = deleteField();
-  }
-  await updateDoc(doc(db, EVENTS_COLLECTION, id), payload);
+  await updateDoc(doc(db, EVENTS_COLLECTION, id), stripUndefined(patch));
 }
 
 export async function deleteEvent(id: string): Promise<void> {
@@ -93,7 +82,7 @@ function formatTimeKorean(time: string): string {
   return `${period} ${hour12}시${minutePart}`;
 }
 
-// 예약 작업이 이 텍스트 그대로 TTS에 넘겨서 개별 일정 음성을 만든다.
+// 브리핑 재생 시 브라우저 음성 합성(Web Speech API)에 그대로 넘기는 문장.
 export function buildSpokenText(event: ScheduleEvent): string {
   const timePart = event.time ? formatTimeKorean(event.time) : null;
 

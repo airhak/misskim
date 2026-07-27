@@ -1,9 +1,8 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
-import type { LocationSetting, WeatherDoc } from './types';
+import type { LocationSetting } from './types';
 
 const SETTINGS_COLLECTION = 'settings';
-const WEATHER_COLLECTION = 'weather';
 const LOCATION_DOC_ID = 'location';
 
 export async function getLocationSetting(): Promise<LocationSetting | null> {
@@ -60,11 +59,6 @@ export async function searchLocation(query: string): Promise<LocationCandidate[]
   }));
 }
 
-export async function getWeatherByDate(date: string): Promise<WeatherDoc | null> {
-  const snap = await getDoc(doc(db, WEATHER_COLLECTION, date));
-  return snap.exists() ? (snap.data() as WeatherDoc) : null;
-}
-
 export interface ForecastResult {
   date: string;
   tempMin: number;
@@ -73,7 +67,7 @@ export interface ForecastResult {
   precipitationChance: number; // 오후(12~18시) 시간대 중 최댓값
 }
 
-// 예약 작업이 매일 아침 이 함수로 예보를 받아 weather/{date} 문서를 만든다. API 키 불필요.
+// 브리핑 화면/음성이 그때그때 실시간으로 이 함수를 호출해서 예보를 받는다. API 키 불필요.
 export async function fetchForecast(lat: number, lon: number): Promise<ForecastResult> {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min&hourly=precipitation_probability&timezone=Asia%2FSeoul&forecast_days=1`;
   const res = await fetch(url);
