@@ -104,3 +104,38 @@ export function buildWeatherSummaryText(forecast: ForecastResult): string {
     forecast.precipitationChance >= 50 ? '오후에는 비가 내립니다. 우산을 준비하셔야 합니다. ' : '';
   return `${rainPart}오늘 평균 기온은 ${Math.round(forecast.tempAvg)}도 입니다.`;
 }
+
+// 채팅에서 "내일 날씨 어때?" 같은 특정 날짜 조회에 쓴다. forecast_days를 넉넉히 잡아 여러 날을 한 번에 받고,
+// targetDate와 일치하는 날짜만 뽑아낸다. 조회 범위(대략 2주) 밖의 날짜면 null.
+export async function fetchForecastForDate(lat: number, lon: number, targetDate: string): Promise<ForecastResult | null> {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min&hourly=precipitation_probability&timezone=Asia%2FSeoul&forecast_days=14`;
+  const res = await fetch(url);
+  const data = await res.json();
+
+  const days: string[] = data.daily.time;
+  const dayIndex = days.indexOf(targetDate);
+  if (dayIndex === -1) return null;
+
+  const tempMax = data.daily.temperature_2m_max[dayIndex];
+  const tempMin = data.daily.temperature_2m_min[dayIndex];
+  const tempAvg = Math.round(((tempMax + tempMin) / 2) * 10) / 10;
+
+  const hours: string[] = data.hourly.time;
+  const precip: number[] = data.hourly.precipitation_probability;
+  let afternoonMax = 0;
+  for (let i = 0; i < hours.length; i++) {
+    if (hours[i].slice(0, 10) !== targetDate) continue;
+    const hour = parseInt(hours[i].slice(11, 13), 10);
+    if (hour >= 12 && hour <= 18) {
+      afternoonMax = Math.max(afternoonMax, precip[i] ?? 0);
+    }
+  }
+
+  return { date: targetDate, tempMin, tempMax, tempAvg, precipitationChance: afternoonMax };
+}
+
+// 채팅 조회 답변용 — 날짜를 문장 앞에 붙여서 여러 날을 답할 때도 헷갈리지 않게 한다.
+export function buildWeatherReplyText(forecast: ForecastResult): string {
+  const rainPart = forecast.precipitationChance >= 50 ? ' 오후에 비 소식이 있어 우산이 필요해요.' : '';
+  return `${forecast.date}: 최저 ${Math.round(forecast.tempMin)}도 / 최고 ${Math.round(forecast.tempMax)}도, 평균 ${Math.round(forecast.tempAvg)}도.${rainPart}`;
+}

@@ -310,7 +310,7 @@ export default function Home() {
       )}
 
       {isChatOpen && (
-        <AssistantChat onClose={() => setIsChatOpen(false)} onEventCreated={refresh} />
+        <AssistantChat location={location} onClose={() => setIsChatOpen(false)} onEventCreated={refresh} />
       )}
     </div>
   );

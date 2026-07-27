@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import styles from '@/app/page.module.css';
-import { createEvent } from '@/lib/scheduleApi';
-import { EVENT_TYPE_LABELS, type EventType } from '@/lib/types';
+import { createEvent, getEventsBetween } from '@/lib/scheduleApi';
+import { buildWeatherReplyText, fetchForecastForDate } from '@/lib/weatherApi';
+import { EVENT_TYPE_LABELS, type EventType, type LocationSetting, type ScheduleEvent } from '@/lib/types';
 
 interface ChatMsg {
   role: 'user' | 'model';
@@ -18,12 +19,52 @@ interface ChatAction {
   eventType: EventType;
 }
 
+interface ChatQuery {
+  type: 'schedule' | 'weather';
+  dateFrom: string;
+  dateTo: string;
+}
+
 interface AssistantChatProps {
+  location: LocationSetting | null;
   onClose: () => void;
   onEventCreated: () => void;
 }
 
-export default function AssistantChat({ onClose, onEventCreated }: AssistantChatProps) {
+function dateRange(from: string, to: string): string[] {
+  const result: string[] = [];
+  const cur = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  let guard = 0;
+  while (cur <= end && guard < 60) {
+    result.push(
+      `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`
+    );
+    cur.setDate(cur.getDate() + 1);
+    guard += 1;
+  }
+  return result;
+}
+
+function formatScheduleReply(events: ScheduleEvent[], dateFrom: string, dateTo: string): string {
+  if (events.length === 0) {
+    return dateFrom === dateTo ? `${dateFrom}에는 일정이 없습니다.` : `${dateFrom} ~ ${dateTo} 기간엔 일정이 없습니다.`;
+  }
+  const byDate = new Map<string, ScheduleEvent[]>();
+  for (const event of events) {
+    const list = byDate.get(event.date) ?? [];
+    list.push(event);
+    byDate.set(event.date, list);
+  }
+  return Array.from(byDate.entries())
+    .map(([d, list]) => {
+      const items = list.map(e => `${e.time ? e.time + ' ' : ''}${e.title}`).join(', ');
+      return `${d}: ${items}`;
+    })
+    .join('\n');
+}
+
+export default function AssistantChat({ location, onClose, onEventCreated }: AssistantChatProps) {
   const [messages, setMessages] = useState<ChatMsg[]>([
     { role: 'model', text: '안녕하세요, 대표님. 일정을 말씀해 주시면 등록해드릴게요.' },
   ]);
@@ -56,10 +97,33 @@ export default function AssistantChat({ onClose, onEventCreated }: AssistantChat
       if (!res.ok) throw new Error(data.error || '응답을 받지 못했습니다.');
       setMessages(prev => [...prev, { role: 'model', text: data.reply }]);
       if (data.action) setPendingAction(data.action);
+      if (data.query) await handleQuery(data.query);
     } catch (err) {
       setError(err instanceof Error ? err.message : '오류가 발생했습니다.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleQuery(query: ChatQuery) {
+    try {
+      if (query.type === 'schedule') {
+        const events = await getEventsBetween(query.dateFrom, query.dateTo);
+        setMessages(prev => [...prev, { role: 'model', text: formatScheduleReply(events, query.dateFrom, query.dateTo) }]);
+        return;
+      }
+      // weather
+      if (!location) {
+        setMessages(prev => [...prev, { role: 'model', text: '근무 지역이 설정되어 있지 않아요. 먼저 지역 설정을 해주세요.' }]);
+        return;
+      }
+      const dates = dateRange(query.dateFrom, query.dateTo);
+      const results = await Promise.all(dates.map(d => fetchForecastForDate(location.lat, location.lon, d)));
+      const lines = results.filter((r): r is NonNullable<typeof r> => r !== null).map(buildWeatherReplyText);
+      const text = lines.length > 0 ? lines.join('\n') : '해당 날짜의 날씨 예보를 가져오지 못했습니다.';
+      setMessages(prev => [...prev, { role: 'model', text }]);
+    } catch {
+      setMessages(prev => [...prev, { role: 'model', text: '조회 중 오류가 발생했습니다.' }]);
     }
   }
 
