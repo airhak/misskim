@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from 'react';
 import styles from './page.module.css';
 import EventFormModal from '@/components/EventFormModal';
 import LocationSettingModal from '@/components/LocationSettingModal';
-import { createEvent, deleteEvent, getEventsByDate, updateEvent } from '@/lib/scheduleApi';
+import { createEvent, deleteEvent, getEventsBetween, getEventsByDate, updateEvent } from '@/lib/scheduleApi';
 import { getLocationSetting, getWeatherByDate, setLocationSetting } from '@/lib/weatherApi';
 import { EVENT_TYPE_LABELS, type LocationSetting, type ScheduleEvent, type WeatherDoc } from '@/lib/types';
 import { OUTRO_AUDIO_URL } from '@/lib/voice';
@@ -17,27 +17,59 @@ interface BriefingTrack {
   eventId: string;
 }
 
-function todayString(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+function toDateString(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function todayString(): string {
+  return toDateString(new Date());
+}
+
+const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+
+// 오늘이 포함된 주(월~일)의 날짜 문자열 7개를 반환한다.
+function getWeekDates(dateStr: string): string[] {
+  const base = new Date(`${dateStr}T00:00:00`);
+  const dayOfWeek = base.getDay(); // 0=일 ... 6=토
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(base);
+  monday.setDate(base.getDate() + mondayOffset);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return toDateString(d);
+  });
 }
 
 export default function Home() {
   const [date] = useState(todayString);
+  const weekDates = useState(() => getWeekDates(todayString()))[0];
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
+  const [weekEvents, setWeekEvents] = useState<ScheduleEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [modalState, setModalState] = useState<{ mode: 'create' | 'edit'; event: ScheduleEvent | null } | null>(
-    null
-  );
+  const [modalState, setModalState] = useState<{
+    mode: 'create' | 'edit';
+    event: ScheduleEvent | null;
+    targetDate: string;
+  } | null>(null);
   const [playingEventId, setPlayingEventId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [weather, setWeather] = useState<WeatherDoc | null>(null);
   const [location, setLocation] = useState<LocationSetting | null>(null);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+
+  async function refreshWeek() {
+    try {
+      const result = await getEventsBetween(weekDates[0], weekDates[6]);
+      setWeekEvents(result);
+    } catch {
+      // 주간 보기는 부가 기능이라 실패해도 오늘 일정 화면은 그대로 둔다.
+    }
+  }
 
   async function refresh() {
     try {
@@ -49,6 +81,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+    await refreshWeek();
   }
 
   useEffect(() => {
@@ -61,13 +94,16 @@ export default function Home() {
         setError(err instanceof Error ? err.message : '일정을 불러오지 못했습니다.');
       })
       .finally(() => setLoading(false));
+    getEventsBetween(weekDates[0], weekDates[6])
+      .then(setWeekEvents)
+      .catch(() => setWeekEvents([]));
     getWeatherByDate(date)
       .then(setWeather)
       .catch(() => setWeather(null));
     getLocationSetting()
       .then(setLocation)
       .catch(() => setLocation(null));
-  }, [date]);
+  }, [date, weekDates]);
 
   async function handleLocationSave(next: LocationSetting) {
     await setLocationSetting(next);
@@ -180,7 +216,7 @@ export default function Home() {
             <div
               key={event.id}
               className={`${styles.eventRow} ${playingEventId === event.id ? styles.eventRowPlaying : ''}`}
-              onClick={() => setModalState({ mode: 'edit', event })}
+              onClick={() => setModalState({ mode: 'edit', event, targetDate: date })}
             >
               <span className={styles.eventTime}>{event.time || '종일'}</span>
               <span className={styles.eventBadge}>{EVENT_TYPE_LABELS[event.type]}</span>
@@ -199,14 +235,56 @@ export default function Home() {
           ))}
         </div>
 
-        <button className={styles.buttonPrimary} onClick={() => setModalState({ mode: 'create', event: null })}>
+        <button
+          className={styles.buttonPrimary}
+          onClick={() => setModalState({ mode: 'create', event: null, targetDate: date })}
+        >
           + 새 일정 추가
         </button>
+
+        <div className={styles.weekSection}>
+          <h2 className={styles.weekTitle}>이번 주 일정</h2>
+          {weekDates.map(d => {
+            const dayEvents = weekEvents.filter(e => e.date === d);
+            const dateObj = new Date(`${d}T00:00:00`);
+            const isToday = d === date;
+            return (
+              <div key={d} className={styles.weekDay}>
+                <div
+                  className={`${styles.weekDayHeader} ${isToday ? styles.weekDayHeaderToday : ''}`}
+                  onClick={() => setModalState({ mode: 'create', event: null, targetDate: d })}
+                >
+                  <span>
+                    {dateObj.getMonth() + 1}/{dateObj.getDate()} ({WEEKDAY_LABELS[dateObj.getDay()]})
+                  </span>
+                  <span className={styles.hint}>+ 추가</span>
+                </div>
+                {dayEvents.length === 0 ? (
+                  <span className={styles.hint}>일정 없음</span>
+                ) : (
+                  dayEvents.map(e => (
+                    <div
+                      key={e.id}
+                      className={styles.weekEventLine}
+                      onClick={ev => {
+                        ev.stopPropagation();
+                        setModalState({ mode: 'edit', event: e, targetDate: d });
+                      }}
+                    >
+                      {e.time ? `${e.time} ` : ''}
+                      {e.title}
+                    </div>
+                  ))
+                )}
+              </div>
+            );
+          })}
+        </div>
       </main>
 
       {modalState && (
         <EventFormModal
-          date={date}
+          defaultDate={modalState.targetDate}
           initial={modalState.event}
           onSave={handleSave}
           onClose={() => setModalState(null)}

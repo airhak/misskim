@@ -6,7 +6,7 @@ import type { EventType, ScheduleEvent } from '@/lib/types';
 import { EVENT_TYPE_LABELS } from '@/lib/types';
 
 interface EventFormModalProps {
-  date: string;
+  defaultDate: string;
   initial: ScheduleEvent | null;
   onSave: (event: Omit<ScheduleEvent, 'id'>) => Promise<void>;
   onClose: () => void;
@@ -14,7 +14,8 @@ interface EventFormModalProps {
 
 const EVENT_TYPES: EventType[] = ['meeting', 'lunch', 'deadline', 'other'];
 
-export default function EventFormModal({ date, initial, onSave, onClose }: EventFormModalProps) {
+export default function EventFormModal({ defaultDate, initial, onSave, onClose }: EventFormModalProps) {
+  const [date, setDate] = useState(initial?.date ?? defaultDate);
   const [time, setTime] = useState(initial?.time ?? '');
   const [title, setTitle] = useState(initial?.title ?? '');
   const [location, setLocation] = useState(initial?.location ?? '');
@@ -44,6 +45,15 @@ export default function EventFormModal({ date, initial, onSave, onClose }: Event
       <div className={styles.modalBox} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>{initial ? '일정 수정' : '새 일정 추가'}</div>
         <div className={styles.modalBody}>
+          <label className={styles.formLabel}>
+            날짜
+            <input
+              className={styles.input}
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+            />
+          </label>
           <label className={styles.formLabel}>
             시간 (없으면 종일/마감 일정)
             <input
