@@ -157,7 +157,13 @@ export default function CalendarPage() {
             <h2 className={styles.weekTitle}>태그</h2>
             {tags.map(tag => (
               <div key={tag.color} className={calStyles.tagRow}>
-                <span className={calStyles.tagDot} style={{ background: TAG_COLOR_HEX[tag.color] }} />
+                <button
+                  type="button"
+                  className={`${calStyles.tagDot} ${tag.active ? '' : calStyles.tagDotInactive}`}
+                  style={{ background: TAG_COLOR_HEX[tag.color] }}
+                  onClick={() => handleTagActiveToggle(tag.color)}
+                  title={tag.active ? '클릭하면 숨김' : '클릭하면 표시'}
+                />
                 <input
                   className={styles.input}
                   value={tag.label}
@@ -166,7 +172,6 @@ export default function CalendarPage() {
                   onBlur={handleTagLabelBlur}
                   style={{ flex: 1 }}
                 />
-                <input type="checkbox" checked={tag.active} onChange={() => handleTagActiveToggle(tag.color)} />
               </div>
             ))}
           </aside>
