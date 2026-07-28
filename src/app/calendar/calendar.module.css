@@ -16,6 +16,18 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
+}
+
+/* 텍스트 입력창은 flex 안에서 기본적으로 안 줄어들어서(min-width:auto), 사이드바 폭보다
+   넓어지며 체크박스를 옆 달력 영역으로 밀어내는 문제가 있었다. 명시적으로 줄어들게 한다.
+   (React가 type 속성을 안 붙이면 DOM에 type="text"가 없을 수 있어 :not()으로 잡는다.) */
+.tagRow input:not([type='checkbox']) {
+  min-width: 0;
+}
+
+.tagRow input[type='checkbox'] {
+  flex-shrink: 0;
 }
 
 .tagDot {
