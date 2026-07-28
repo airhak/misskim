@@ -14,7 +14,9 @@ import {
   updateEvent,
 } from '@/lib/scheduleApi';
 import { buildWeatherSummaryText, fetchForecast, getLocationSetting, setLocationSetting } from '@/lib/weatherApi';
-import { EVENT_TYPE_LABELS, type LocationSetting, type ScheduleEvent } from '@/lib/types';
+import { getTags } from '@/lib/tagsApi';
+import { EVENT_TYPE_LABELS, type LocationSetting, type ScheduleEvent, type Tag } from '@/lib/types';
+import Link from 'next/link';
 
 const OUTRO_TRACK_ID = '__outro__';
 const WEATHER_TRACK_ID = '__weather__';
@@ -68,6 +70,7 @@ export default function Home() {
   const [location, setLocation] = useState<LocationSetting | null>(null);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [tags, setTags] = useState<Tag[]>([]);
 
   async function refreshWeek() {
     try {
@@ -107,6 +110,9 @@ export default function Home() {
     getLocationSetting()
       .then(setLocation)
       .catch(() => setLocation(null));
+    getTags()
+      .then(setTags)
+      .catch(() => setTags([]));
   }, [date, weekDates]);
 
   useEffect(() => {
@@ -182,6 +188,10 @@ export default function Home() {
           <h1 className={styles.title}>오늘의 일정</h1>
           <span className={styles.dateLabel}>{date}</span>
         </div>
+
+        <Link href="/calendar" className={styles.button} style={{ textAlign: 'center' }}>
+          📅 달력으로 보기
+        </Link>
 
         <button className={styles.buttonPrimary} onClick={() => setIsChatOpen(true)}>
           💬 미스킴에게 말하기
@@ -308,6 +318,7 @@ export default function Home() {
         <EventFormModal
           defaultDate={modalState.targetDate}
           initial={modalState.event}
+          tags={tags}
           onSave={handleSave}
           onClose={() => setModalState(null)}
         />

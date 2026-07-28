@@ -2,25 +2,27 @@
 
 import { useState } from 'react';
 import styles from '@/app/page.module.css';
-import type { EventType, ScheduleEvent } from '@/lib/types';
-import { EVENT_TYPE_LABELS } from '@/lib/types';
+import type { EventType, ScheduleEvent, Tag, TagColor } from '@/lib/types';
+import { EVENT_TYPE_LABELS, TAG_COLOR_HEX } from '@/lib/types';
 
 interface EventFormModalProps {
   defaultDate: string;
   initial: ScheduleEvent | null;
+  tags: Tag[];
   onSave: (event: Omit<ScheduleEvent, 'id'>) => Promise<void>;
   onClose: () => void;
 }
 
 const EVENT_TYPES: EventType[] = ['meeting', 'lunch', 'deadline', 'other'];
 
-export default function EventFormModal({ defaultDate, initial, onSave, onClose }: EventFormModalProps) {
+export default function EventFormModal({ defaultDate, initial, tags, onSave, onClose }: EventFormModalProps) {
   const [date, setDate] = useState(initial?.date ?? defaultDate);
   const [time, setTime] = useState(initial?.time ?? '');
   const [title, setTitle] = useState(initial?.title ?? '');
   const [location, setLocation] = useState(initial?.location ?? '');
   const [type, setType] = useState<EventType>(initial?.type ?? 'meeting');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [tagColor, setTagColor] = useState<TagColor | undefined>(initial?.tagColor);
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -34,6 +36,7 @@ export default function EventFormModal({ defaultDate, initial, onSave, onClose }
         location: location.trim() || undefined,
         type,
         notes: notes.trim() || undefined,
+        tagColor,
       });
     } finally {
       setSaving(false);
@@ -98,7 +101,39 @@ export default function EventFormModal({ defaultDate, initial, onSave, onClose }
             </div>
           </label>
           <label className={styles.formLabel}>
-            메모
+            태그
+            <div className={styles.typeRow}>
+              <button
+                type="button"
+                className={`${styles.typeButton} ${!tagColor ? styles.typeButtonActive : ''}`}
+                onClick={() => setTagColor(undefined)}
+              >
+                없음
+              </button>
+              {tags.map(tag => (
+                <button
+                  key={tag.color}
+                  type="button"
+                  className={`${styles.typeButton} ${tagColor === tag.color ? styles.typeButtonActive : ''}`}
+                  onClick={() => setTagColor(tag.color)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '0.6rem',
+                      height: '0.6rem',
+                      borderRadius: '999px',
+                      background: TAG_COLOR_HEX[tag.color],
+                    }}
+                  />
+                  {tag.label || tag.color}
+                </button>
+              ))}
+            </div>
+          </label>
+          <label className={styles.formLabel}>
+            내용
             <textarea
               className={styles.textarea}
               value={notes}
