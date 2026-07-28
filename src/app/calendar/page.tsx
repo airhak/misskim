@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { PanelLeft, PanelRight, CalendarDays } from 'lucide-react';
 import styles from '../page.module.css';
 import calStyles from './calendar.module.css';
 import EventFormModal from '@/components/EventFormModal';
-import DayEventsModal from '@/components/DayEventsModal';
 import { createEvent, deleteEvent, getEventsBetween, updateEvent } from '@/lib/scheduleApi';
 import { getTags, setTags as saveTags } from '@/lib/tagsApi';
-import { TAG_COLOR_HEX, type ScheduleEvent, type Tag, type TagColor } from '@/lib/types';
+import { EVENT_TYPE_LABELS, TAG_COLOR_HEX, type ScheduleEvent, type Tag, type TagColor } from '@/lib/types';
 
 function toDateString(d: Date): string {
   const year = d.getFullYear();
@@ -44,8 +44,11 @@ export default function CalendarPage() {
   });
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const [tags, setTagsState] = useState<Tag[]>([]);
-  const [dayModalDate, setDayModalDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => toDateString(new Date()));
   const [formState, setFormState] = useState<FormState | null>(null);
+  const [showTags, setShowTags] = useState(true);
+  const [showCalendar, setShowCalendar] = useState(true);
+  const [showDetail, setShowDetail] = useState(true);
 
   const gridDates = getMonthGridDates(cursor.year, cursor.month);
   const rangeStart = gridDates[0].date;
@@ -114,18 +117,42 @@ export default function CalendarPage() {
     await refresh();
   }
 
-  const dayEventsForModal = dayModalDate ? events.filter(e => e.date === dayModalDate) : [];
+  const selectedDayEvents = events.filter(e => e.date === selectedDate);
   const today = toDateString(new Date());
 
   return (
     <div className={styles.page}>
-      <main className={styles.main} style={{ maxWidth: '900px' }}>
+      <main className={styles.main} style={{ maxWidth: '1100px' }}>
         <div className={styles.headerRow}>
           <h1 className={styles.title}>달력</h1>
-          <Link href="/" className={styles.button}>← 목록으로</Link>
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+            <button
+              className={`${styles.button} ${showTags ? styles.typeButtonActive : ''}`}
+              onClick={() => setShowTags(v => !v)}
+              title="태그 사이드바 표시/숨김"
+            >
+              <PanelLeft size={16} />
+            </button>
+            <button
+              className={`${styles.button} ${showCalendar ? styles.typeButtonActive : ''}`}
+              onClick={() => setShowCalendar(v => !v)}
+              title="달력 표시/숨김"
+            >
+              <CalendarDays size={16} />
+            </button>
+            <button
+              className={`${styles.button} ${showDetail ? styles.typeButtonActive : ''}`}
+              onClick={() => setShowDetail(v => !v)}
+              title="세부 일정 패널 표시/숨김"
+            >
+              <PanelRight size={16} />
+            </button>
+            <Link href="/" className={styles.button}>← 목록으로</Link>
+          </div>
         </div>
 
         <div className={calStyles.layout}>
+          {showTags && (
           <aside className={calStyles.sidebar}>
             <h2 className={styles.weekTitle}>태그</h2>
             {tags.map(tag => (
@@ -143,7 +170,9 @@ export default function CalendarPage() {
               </div>
             ))}
           </aside>
+          )}
 
+          {showCalendar && (
           <div className={calStyles.gridArea}>
             <div className={calStyles.monthNav}>
               <button className={styles.button} onClick={() => goToMonth(-1)}>‹</button>
@@ -169,8 +198,8 @@ export default function CalendarPage() {
                 return (
                   <div
                     key={d}
-                    className={`${calStyles.cell} ${inMonth ? '' : calStyles.cellOutside} ${d === today ? calStyles.cellToday : ''}`}
-                    onClick={() => setDayModalDate(d)}
+                    className={`${calStyles.cell} ${inMonth ? '' : calStyles.cellOutside} ${d === today ? calStyles.cellToday : ''} ${d === selectedDate ? calStyles.cellSelected : ''}`}
+                    onClick={() => setSelectedDate(d)}
                   >
                     <div className={calStyles.cellHeader}>
                       <span>{dayNum}</span>
@@ -189,20 +218,61 @@ export default function CalendarPage() {
               })}
             </div>
           </div>
+          )}
+
+          {showDetail && (
+          <aside className={calStyles.detailPanel}>
+            <h2 className={styles.weekTitle}>{selectedDate}</h2>
+            <div className={calStyles.detailList}>
+              {selectedDayEvents.length === 0 && <p className={styles.hint}>등록된 일정이 없습니다.</p>}
+              {selectedDayEvents.map(event => {
+                const tag = tags.find(t => t.color === event.tagColor);
+                return (
+                  <div
+                    key={event.id}
+                    className={styles.eventRow}
+                    style={{ flexWrap: 'wrap' }}
+                    onClick={() => setFormState({ mode: 'edit', event, targetDate: selectedDate })}
+                  >
+                    {tag && (
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          width: '0.6rem',
+                          height: '0.6rem',
+                          borderRadius: '999px',
+                          background: TAG_COLOR_HEX[tag.color],
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                    <span className={styles.eventTime}>{event.time || '종일'}</span>
+                    <span className={styles.eventBadge}>{EVENT_TYPE_LABELS[event.type]}</span>
+                    <span className={styles.eventTitle}>{event.title}</span>
+                    <button
+                      className={styles.deleteButton}
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleDeleteEvent(event.id);
+                      }}
+                    >
+                      삭제
+                    </button>
+                    {event.notes && <p className={styles.hint} style={{ width: '100%', margin: 0 }}>{event.notes}</p>}
+                  </div>
+                );
+              })}
+            </div>
+            <button
+              className={styles.buttonPrimary}
+              onClick={() => setFormState({ mode: 'create', event: null, targetDate: selectedDate })}
+            >
+              + 새 일정
+            </button>
+          </aside>
+          )}
         </div>
       </main>
-
-      {dayModalDate && (
-        <DayEventsModal
-          date={dayModalDate}
-          events={dayEventsForModal}
-          tags={tags}
-          onEdit={event => setFormState({ mode: 'edit', event, targetDate: dayModalDate })}
-          onAddNew={() => setFormState({ mode: 'create', event: null, targetDate: dayModalDate })}
-          onDelete={handleDeleteEvent}
-          onClose={() => setDayModalDate(null)}
-        />
-      )}
 
       {formState && (
         <EventFormModal
