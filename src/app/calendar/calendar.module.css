@@ -138,12 +138,7 @@
 
   .sidebar {
     width: 100%;
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  .tagRow {
-    width: 48%;
+    flex-direction: column;
   }
 
   .detailPanel {
